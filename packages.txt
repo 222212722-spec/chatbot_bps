@@ -1,1 +1,2 @@
+# memastikan semua library Python yang butuh dikompilasi bisa diinstal tanpa error
 build-essential

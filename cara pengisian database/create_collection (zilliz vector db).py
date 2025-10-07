@@ -8,92 +8,84 @@ from pymilvus import (
     DataType,
 )
 
-# --- 1. Zilliz Cloud Connection Details (Use your details) ---
-ZILLIZ_ENDPOINT = "XXX"
-ZILLIZ_TOKEN = "XXX"
-DIMENSION = 768  
-MAX_VARCHAR_LENGTH = 512
-MAX_ID_LENGTH = 200 
+# --- 1. Detail Koneksi ke Zilliz Cloud (ISI DENGAN KREDENSIAL ANDA SENDIRI) ---
+ZILLIZ_ENDPOINT = "XXX"  # Ganti dengan endpoint dari Zilliz Cloud
+ZILLIZ_TOKEN = "XXX"      # Ganti dengan API Token kamu
 
-# --- 2. Connect to Zilliz Cloud ---
+# Dimensi vektor hasil embedding (harus sama dengan model yang digunakan)
+DIMENSION = 768
+
+# Batas panjang maksimum untuk tipe teks
+MAX_VARCHAR_LENGTH = 512
+MAX_ID_LENGTH = 200
+
+# --- 2. Menghubungkan ke Zilliz Cloud ---
 try:
     connections.connect(
         alias="default",
         uri=ZILLIZ_ENDPOINT,
         token=ZILLIZ_TOKEN
     )
-    print("Successfully connected to Zilliz Cloud.")
+    print("✅ Berhasil terhubung ke Zilliz Cloud.")
 except Exception as e:
-    print(f"Failed to connect to Zilliz Cloud: {e}")
-    # exit() 
+    print(f"❌ Gagal terhubung ke Zilliz Cloud: {e}")
+    # exit()  # Jika ingin langsung keluar saat gagal koneksi, hilangkan tanda komentar ini
 
-# --- 3. Base Fields (Common to ALL collections) ---
-BASE_FIELDS = [
-    # Primary Key: unique (ensures global uniqueness across all tables)
-    FieldSchema(name="unique", dtype=DataType.VARCHAR, is_primary=True, auto_id=False, max_length=MAX_ID_LENGTH),
-    # Vector Field: embedding
+# --- 3. Skema Koleksi untuk Data Informasi Umum (general) ---
+COLLECTION_NAME = "general"
+
+# Daftar field dalam koleksi
+FIELDS = [
+    # Primary Key: chunk_id (unik untuk setiap potongan teks)
+    FieldSchema(name="chunk_id", dtype=DataType.VARCHAR, is_primary=True, auto_id=False, max_length=MAX_ID_LENGTH),
+
+    # Field vektor untuk embedding
     FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=DIMENSION),
-    # Text Content for context/search (The combined text used to generate the embedding)
+
+    # Konten teks utama
     FieldSchema(name="page_content", dtype=DataType.VARCHAR, max_length=65535),
-    # Title and Link metadata
-    FieldSchema(name="title", dtype=DataType.VARCHAR, max_length=MAX_VARCHAR_LENGTH * 2),
-    FieldSchema(name="link", dtype=DataType.VARCHAR, max_length=MAX_VARCHAR_LENGTH),
+
+    # Metadata
+    FieldSchema(name="service_id", dtype=DataType.VARCHAR, max_length=MAX_ID_LENGTH),
+    FieldSchema(name="title", dtype=DataType.VARCHAR, max_length=MAX_VARCHAR_LENGTH),
+    FieldSchema(name="menu", dtype=DataType.VARCHAR, max_length=MAX_VARCHAR_LENGTH),
+    FieldSchema(name="link", dtype=DataType.VARCHAR, max_length=MAX_VARCHAR_LENGTH * 2),
 ]
 
-# --- 4. Define Specific Schema Fields for 'tables' Collection ---
-COLLECTION_NAME = "tables"
-CONFIG = {
-    "description": "Vector collection for all BPS statistical tables (Static, Dynamic, and Simdasi).",
-    "fields": [
-        # Metadata from alltables.json:
-        FieldSchema(name="id", dtype=DataType.VARCHAR, max_length=MAX_ID_LENGTH), 
-        FieldSchema(name="id_table", dtype=DataType.VARCHAR, max_length=MAX_ID_LENGTH), 
-        FieldSchema(name="id_subcat", dtype=DataType.INT64), # Numerical ID 
-        FieldSchema(name="subcat", dtype=DataType.VARCHAR, max_length=MAX_VARCHAR_LENGTH),
-        FieldSchema(name="tablesource", dtype=DataType.VARCHAR, max_length=10), # 1, 2, atau 3
-        FieldSchema(name="last_update", dtype=DataType.VARCHAR, max_length=50), 
-        # Field 'years' stored as VARCHAR/JSON string, as requested
-        FieldSchema(name="years", dtype=DataType.VARCHAR, max_length=MAX_VARCHAR_LENGTH * 2), 
-    ]
-}
+# --- 4. Membuat Koleksi ---
+print(f"\n--- Proses pembuatan koleksi '{COLLECTION_NAME}' dimulai ---")
 
-# --- 5. Main Script Logic: Create Collection ---
-print(f"\n--- Processing '{COLLECTION_NAME}' collection ---")
-
-# Check if the collection already exists
 if utility.has_collection(COLLECTION_NAME):
-    print(f"Collection '{COLLECTION_NAME}' already exists. Skipping creation.")
+    print(f"⚠️ Koleksi '{COLLECTION_NAME}' sudah ada. Melewati proses pembuatan.")
 else:
-    # Combine base fields and specific fields
-    all_fields = BASE_FIELDS + CONFIG["fields"]
-
-    # Create the schema for the collection
+    # Membuat skema
     schema = CollectionSchema(
-        fields=all_fields,
-        description=CONFIG["description"],
-        enable_dynamic_field=True 
+        fields=FIELDS,
+        description="Koleksi vektor untuk data informasi umum BPS (general information).",
+        enable_dynamic_field=True
     )
 
-    # Create the collection
+    # Membuat koleksi di Zilliz
     collection = Collection(
         name=COLLECTION_NAME,
         schema=schema,
         using="default"
     )
 
-    # Define and Create the vector index
+    # Membuat indeks vektor (otomatis, berbasis cosine similarity)
     index_params = {
-        "index_type": "AUTOINDEX", 
-        "metric_type": "COSINE"      
+        "index_type": "AUTOINDEX",
+        "metric_type": "COSINE"
     }
+
     collection.create_index(
         field_name="embedding",
         index_params=index_params
     )
-    
-    # Load the collection into memory (required for searching)
+
+    # Memuat ke memori (diperlukan agar bisa dicari)
     collection.load()
 
-    print(f"Successfully created and loaded collection '{COLLECTION_NAME}' with a vector index.")
+    print(f"✅ Koleksi '{COLLECTION_NAME}' berhasil dibuat dan dimuat ke memori.")
 
-print("\nCollection creation verified.")
+print("\n✔️ Verifikasi pembuatan koleksi selesai.")

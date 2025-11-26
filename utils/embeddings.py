@@ -28,14 +28,7 @@ def get_query_embedding_model() -> Embeddings:
     return embeddings
 
 def embed_query_text(query: str) -> List[float]:
-    """
-    Mengubah teks pertanyaan (query) mentah menjadi vektor embedding
-    menggunakan awalan (prefix), yang merupakan best practice
-    untuk model embedding Gemma.
-    """
     model = get_query_embedding_model()
-    # Model Gemma bekerja lebih baik jika tugasnya ditentukan (misalnya, 'query' vs 'document')
-    prefixed_query = f"query: {query}"
-    
-    # Lakukan konversi teks (dengan awalan) menjadi vektor angka
+    sanitized = " ".join(query.strip().split())  # hapus spasi berlebih, newline, dsb.
+    prefixed_query = f"task: search result | query: {sanitized}"
     return model.embed_query(prefixed_query)

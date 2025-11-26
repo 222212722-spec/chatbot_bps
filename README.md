@@ -1,4 +1,4 @@
-Perubahan Baru: Fokus ke Tabel
+Perubahan Baru: Fokus ke Tabel Statistik.
 Hasil sudah lebih akurat dari sebelumnya
 <img width="1740" height="799" alt="image" src="https://github.com/user-attachments/assets/91dbefdd-b9c6-43a5-9d4d-6b5776adfafa" />
 

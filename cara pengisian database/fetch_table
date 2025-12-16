@@ -1,0 +1,95 @@
+import requests
+import json
+import time
+
+# URL dasar API. Domain dan API key bersifat tetap.
+BASE_URL = "https://webapi.bps.go.id/v1/api/list/domain/3273/model/tablestatistic/key/[KEY MASUK SINI]/page/"
+
+def fetch_page(page_number, max_retries=5, retry_delay=5):
+    """
+    Mengambil data dari satu halaman API dengan mekanisme percobaan ulang (retry).
+
+    Args:
+        page_number (int): Nomor halaman yang akan diambil.
+        max_retries (int): Jumlah maksimum percobaan ulang.
+        retry_delay (int): Jeda waktu (dalam detik) antar percobaan ulang.
+
+    Returns:
+        dict atau None: Data JSON dari halaman tersebut, atau None jika gagal.
+    """
+    url = f"{BASE_URL}{page_number}"
+    print(f"Mengambil halaman {page_number} dari {url}...")
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(url, timeout=10)
+            # Memunculkan HTTPError jika status respons 4xx atau 5xx
+            response.raise_for_status()
+            data = response.json()
+
+            # Memastikan format data sesuai dengan yang diharapkan
+            if "data" in data and isinstance(data["data"], list):
+                # Diasumsikan elemen kedua berisi data utama yang dibutuhkan
+                return data["data"][1]
+            else:
+                print(f"Format data tidak sesuai pada halaman {page_number}: {data}")
+                return None
+
+        except requests.exceptions.RequestException as e:
+            print(f"Percobaan ke-{attempt + 1} gagal: {e}")
+            if attempt < max_retries - 1:
+                print(f"Mencoba ulang dalam {retry_delay} detik...")
+                time.sleep(retry_delay)
+            else:
+                print(f"Gagal mengambil halaman {page_number} setelah {max_retries} kali percobaan.")
+                return None
+
+def main():
+    """
+    Fungsi utama untuk mengatur proses pengambilan dan penyimpanan data.
+    """
+    all_tables_data = []
+
+    # 1. Mengambil halaman pertama untuk mengetahui jumlah total halaman
+    try:
+        first_page_url = f"{BASE_URL}1"
+        print(f"Mengambil halaman awal untuk mengetahui total halaman dari {first_page_url}...")
+        response = requests.get(first_page_url, timeout=10)
+        response.raise_for_status()
+        first_page_data = response.json()
+
+        if "data" in first_page_data and isinstance(first_page_data["data"], list):
+            total_pages = first_page_data["data"][0].get("pages", 0)
+            print(f"Total halaman yang akan diambil: {total_pages}")
+
+            # Menambahkan data dari halaman pertama
+            # Diasumsikan elemen kedua berisi daftar tabel
+            all_tables_data.extend(first_page_data["data"][1])
+        else:
+            print("Struktur respons halaman pertama tidak sesuai.")
+            return
+
+    except requests.exceptions.RequestException as e:
+        print(f"Terjadi kesalahan saat mengambil halaman awal: {e}")
+        return
+
+    # 2. Mengambil data dari halaman-halaman berikutnya
+    for page_num in range(2, total_pages + 1):
+        page_data = fetch_page(page_num)
+        if page_data:
+            all_tables_data.extend(page_data)
+
+        # Opsional: beri jeda kecil agar tidak membebani server API
+        time.sleep(0.5)
+
+    # 3. Menyimpan seluruh data yang telah dikumpulkan ke satu file JSON
+    output_filename = "bps_data.json"
+    try:
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            json.dump(all_tables_data, f, indent=4, ensure_ascii=False)
+        print(f"Berhasil menyimpan {len(all_tables_data)} data ke file '{output_filename}'")
+    except IOError as e:
+        print(f"Terjadi kesalahan saat menyimpan file: {e}")
+
+if __name__ == "__main__":
+    main()

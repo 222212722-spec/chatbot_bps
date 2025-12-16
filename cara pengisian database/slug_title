@@ -1,0 +1,51 @@
+import json
+import re
+
+INPUT_FILE = "bps_data.json"
+OUTPUT_FILE = "alltables_ready.json"
+
+BASE_URL = "https://bandungkota.bps.go.id/id/statistics-table"
+
+def slugify(text: str) -> str:
+    """
+    Mengubah judul menjadi slug yang ramah URL.
+    """
+    text = text.lower()
+    # hapus karakter selain huruf, angka, dan spasi
+    text = re.sub(r'[^a-z0-9\s-]', '', text)
+    # ganti spasi (1 atau lebih) dengan "-"
+    text = re.sub(r'\s+', '-', text).strip('-')
+    return text
+
+def main():
+    # 1. Baca file JSON awal
+    with open(INPUT_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    for item in data:
+        title = item.get("title", "")
+        table_id = item.get("id", "")
+        tablesource = item.get("tablesource", "")
+
+        if not title or not table_id or not tablesource:
+            item["link"] = ""
+            continue
+
+        slug = slugify(title)
+
+        # 2. Bentuk link
+        # format:
+        # https://bandungkota.bps.go.id/id/statistics-table/{tablesource}/{id}/{slug}
+        link = f"{BASE_URL}/{tablesource}/{table_id}/{slug}"
+
+        # 3. Simpan ke objek
+        item["link"] = link
+
+    # 4. Simpan ke file JSON baru
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+    print(f"Berhasil membuat link dan menyimpan ke '{OUTPUT_FILE}'")
+
+if __name__ == "__main__":
+    main()
